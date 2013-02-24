@@ -34,3 +34,18 @@ function stuartc_module_install() {
 function stuartc_module_uninstall() {
   drupal_uninstall_schema('stuartc_module');
 }
+
+/**
+ * Add Persistent URL integration.
+ */
+function stuartc_module_update_6100() {
+  $modules = array('ctools', 'purl');
+  foreach ($modules as $module) {
+    module_enable(array($module));
+    module_load_include('install', $module);
+    if (function_exists($function = "{$module}_install")) {
+      $function();
+    }
+  }
+  return array();
+}

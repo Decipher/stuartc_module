@@ -2,6 +2,18 @@
 // $Id$
 
 /**
+ * Implements hook_init().
+ */
+function stuartc_module_init() {
+  if (php_sapi_name() != 'cli') {
+  $parts = explode('/', $_REQUEST['q']);
+  if ($parts[0] !== 'lark') {
+    drupal_goto('lark/' . $_REQUEST['q']);
+  }
+}
+}
+
+/**
  * Implementation of hook_menu().
  */
 function stuartc_module_menu() {
@@ -297,3 +309,24 @@ function stuartc_module_design_full() {
   readfile($path);
   exit;
 }
+
+function stuartc_module_purl_provider() {
+  return array(
+    'stuartc_module_provider' => array(
+      'name' => t('Stuar.tc module provider'),
+      'description' => t('Prefixes all URLS with "lark"'),
+      'callback' => 'stuartc_module_purl_callback',
+      'example' => 'lark',
+    ),
+  );
+}
+
+function stuartc_module_purl_modifiers() {
+  return array(
+    'stuartc_module_provider' => array(
+      array('value' => 'lark', 'id' => 1),
+    )
+  );
+}
+
+function stuartc_module_purl_callback() {}
