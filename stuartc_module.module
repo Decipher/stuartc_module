@@ -1,0 +1,299 @@
+<?php
+// $Id$
+
+/**
+ * Implementation of hook_menu().
+ */
+function stuartc_module_menu() {
+  $items = array();
+
+  $items['s/frontpage'] = array(
+    'page callback' => 'stuartc_module_frontpage',
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+  );
+
+  $items['s/module/%/changelog'] = array(
+    'page callback' => 'stuartc_module_changelog',
+    'page arguments' => array(2),
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+  );
+
+  $items[file_create_path() .'/design/full/%'] = array(
+    'page callback' => 'stuartc_module_design_full',
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+  );
+
+  return $items;
+}
+
+function stuartc_module_frontpage() {
+  return '';
+}
+
+/**
+ * Implementation of hook_theme().
+ */
+function stuartc_module_theme($existing, $type, $theme, $path) {
+  return array(
+    'stuartc_changelog' => array(
+      'arguments' => array('node' => array(), 'changelog' => array()),
+      'template' => 'stuartc-changelog',
+    ),
+  );
+}
+
+/**
+ * Implementation of hook_views_api().
+ */
+function stuartc_module_views_api() {
+  return array(
+    'api' => 2,
+    'path' => drupal_get_path('module', 'stuartc_module'),
+  );
+}
+
+/**
+ * Implementation of hook_nodeapi().
+ */
+function stuartc_module_form_alter(&$form, $form_state, $form_id) {
+  switch ($form_id) {
+    case 'block_admin_configure':
+      $presets = array(t('<None>'));
+
+      module_load_include('inc', 'textimage', 'textimage_admin');
+      foreach (textimage_get_presets() as $preset) {
+        if (strstr($preset->name, 'block_title')) {
+          $presets[$preset->name] = $preset->name;
+        }
+      }
+
+      $form['block_settings']['textimage'] = array(
+        '#type' => 'select',
+        '#title' => t('Block title - textimage preset'),
+        '#options' => $presets,
+        '#default_value' => isset($form['delta']['#value']) ? variable_get('stuartc_block_'. $form['module']['#value'] .'-'. $form['delta']['#value'] .'_preset', 0) : 0,
+        '#weight' => -17,
+      );
+
+      $form['#submit'][] = 'stuartc_module_block_textimage_preset_submit';
+      break;
+  }
+}
+
+function stuartc_module_block_textimage_preset_submit($form, &$form_state) {
+  variable_set(
+    'stuartc_block_'. $form_state['values']['module'] .'-'. $form_state['values']['delta'] .'_preset',
+    $form_state['values']['textimage']
+  );
+}
+
+/**
+ * Implementation of hook_block().
+ */
+function stuartc_module_block($op = 'list', $delta = 0, $edit = array()) {
+  if ($op == 'list') {
+    return array(
+      array(
+        'info' => t('profile: who am i'),
+        'weight' => 0,
+        'status' => 1,
+        'region' => 'content_bottom',
+      ),
+      // BLOCK_CACHE_PER_ROLE will be assumed for block 0.
+
+      array(
+        'info' => t('profile: contact me'),
+        'cache' => BLOCK_CACHE_PER_ROLE | BLOCK_CACHE_PER_PAGE,
+        'weight' => 0,
+        'status' => 1,
+        'region' => 'content_bottom',
+      ),
+    );
+  }
+
+  else if ($op == 'view') {
+    return stuartc_module_block_content($delta);
+  }
+}
+
+function stuartc_module_block_content($delta) {
+  $profile = user_load(1);
+
+  switch ($delta) {
+    case 0:
+      $block = array(
+        'subject' => t('who am i'),
+        'content' => theme('imagecache', 'biography_photo_small', $profile->picture, drupal_strtolower($profile->name), drupal_strtolower($profile->name)) .
+'<dl>
+  <dt class="name">'. t('name') .':</dt>
+  <dd class="name">'. drupal_strtolower($profile->name) .'</dd>
+  <dt class="gender">'. t('gender') .':</dt>
+  <dd class="gender">'. drupal_strtolower($profile->profile_gender) .'</dd>
+  <dt class="age">'. t('age') .':</dt>
+  <dd class="age">'. (format_date(time(), 'custom', 'Y') - $profile->profile_dob['year'] - (format_date(time(), 'custom', 'nd') < $profile->profile_dob['month'] . str_pad($profile->profile_dob['day'], 2, 0, STR_PAD_LEFT))) .'</dd>
+  <dt class="location">'. t('location') .':</dt>
+  <dd class="location">'. drupal_strtolower($profile->profile_location) .'</dd>
+  <dt class="biography">'. t('biography') .':</dt>
+  <dd class="biography">'. drupal_strtolower($profile->profile_biography) .'</dd>
+</dl>',
+      );
+      break;
+
+    case 1:
+      $twitter = array_keys(twitter_twitter_accounts($profile));
+
+      $items = array(
+        array('data' => l(theme('textimage_image', 'contact', $profile->mail), 'mailto:'. $profile->mail,  array('html' => true)), 'class' => 'email'),
+        array('data' => l(theme('textimage_image', 'contact', 'twitter.com'), 'http://twitter.com/'. $twitter[0], array('html' => true)), 'class' => 'twitter'),
+        array('data' => l(theme('textimage_image', 'contact', 'drupal.org'), $profile->profile_drupal, array('html' => true)), 'class' => 'drupal'),
+        array('data' => l(theme('textimage_image', 'contact', 'facebook.com'), $profile->profile_facebook, array('html' => true)), 'class' => 'facebook'),
+        array('data' => l(theme('textimage_image', 'contact', 'last.fm'), $profile->profile_lastfm, array('html' => true)), 'class' => 'last_fm'),
+      );
+
+      $block = array(
+        'subject' => t('contact'),
+        'content' => theme('item_list', $items),
+      );
+      break;
+  }
+
+  return $block;
+}
+
+/**
+ * Implementation of hook_cron().
+ */
+function stuartc_module_cron() {
+  $results = db_query('SELECT * FROM {content_type_module} WHERE 1');
+
+  while ($result = db_fetch_object($results)) {
+    stuartc_module_get_module_usage($result);
+    stuartc_module_get_module_downloads($result);
+  }
+}
+
+function stuartc_module_get_module_usage($result) {
+  $error = FALSE;
+
+  $url = 'http://www.dapper.net/RunDapp?dappName=DrupalModuleUsage&v=1&v_module='. $result->field_project_id_value;
+  $xml = drupal_http_request($url);
+
+  $data = $range = $t_total = array();
+  $max = NULL;
+
+  preg_match_all("/\<data.*?\>(.*?)\<\/data\>/s", $xml->data, $weeks);
+  foreach ($weeks[1] as $week) {
+    preg_match("/\<Total.*?\>(.*?)\<\/Total\>/s", $week, $t_total);
+
+    if (empty($t_total[1])) {
+      $error = TRUE;
+      break;
+    }
+
+    $t_total[1] = str_replace(',', '', $t_total[1]);
+    $data['total'][] = $t_total[1];
+    $max = $t_total[1] > $max ? $t_total[1] : $max;
+  }
+
+  if ($error == FALSE) {
+    foreach ($data as &$item) {
+      $item = array_reverse($item);
+      $item = implode(',', $item);
+      $range[] = '0,'. $max;
+    }
+
+    $url = 'http://chart.apis.google.com/chart?chs=333x100&chco=C5000B&chxt=y&chxl=0:|0|'. $max .'&cht=lc&chd=t:'. implode('|', $data) .'&chds='. implode(',', $range);
+    $image = drupal_http_request($url);
+    file_save_data($image->data, file_directory_path() .'/usage/'. $result->field_project_id_value .'.png', FILE_EXISTS_REPLACE);
+  }
+}
+
+function stuartc_module_get_module_downloads($module) {
+  $url = 'http://drupal.org/node/'. $module->field_do_nid_value .'/release/feed';
+  $xml = drupal_http_request($url);
+
+  preg_match_all('/\<pubDate\>(.*?)\<\/pubDate\>/', $xml->data, $pub_date);
+
+  $latest_date = 0;
+  foreach ($pub_date[1] as $date) {
+    $latest_date = strtotime($date) > $latest_date ? strtotime($date) : $latest_date;
+  }
+
+  preg_match('/\<item\>.*\<title\>(.*?)\s.*?\<\/title\>/s', $xml->data, $module);
+  $result = db_fetch_object(db_query("SELECT updated FROM {stuartc_module_module_downloads} WHERE module = '%s'", $module[1]));
+
+  if (empty($result) || $latest_date > $result->updated) {
+    preg_match_all('/\<item\>(.*?)\<\/item\>/s', $xml->data, $items);
+    foreach ($items[1] as $item) {
+      preg_match('/\<title\>(.*?)\<\/title\>/', $item, $title);
+      preg_match('/\<pubDate\>(.*?)\<\/pubDate\>/', $item, $date);
+      preg_match('/\<description\>(.*?)\<\/description\>/s', $item, $description);
+
+      $description = htmlspecialchars_decode($description[1]);
+      preg_match('/\<a href\=\"(http:\/\/ftp.*?)\"\>/', $description, $url);
+      preg_match('/filesize\"\>(.*?)\</', $description, $size);
+
+      $data[] = array(
+        'title' => $title[1],
+        'date' => strtotime($date[1]),
+        'size' => $size[1],
+        'url' => $url[1],
+      );
+    }
+
+    if (empty($result)) {
+      db_query(
+        "INSERT INTO {stuartc_module_module_downloads} (module, updated, data) VALUES ('%s', '%s', '%s')",
+        $module[1], $latest_date, serialize($data)
+      );
+    }
+    else {
+      db_query(
+        "UPDATE {stuartc_module_module_downloads} SET updated = '%s', data = '%s' WHERE module = '%s'",
+        $latest_date, serialize($data), $module[1]
+      );
+    }
+  }
+
+  return '';
+}
+
+function stuartc_module_changelog($module) {
+  $changelog = array();
+
+  $nid = drupal_substr(drupal_lookup_path('source', 's/module/'. $module), 5);
+  $node = node_load($nid);
+
+  if (!empty($node->field_changelog_entry[0]['value'])) {
+    foreach ($node->field_changelog_entry as $entry) {
+      $temp = explode("\r", $entry['value']);
+      unset($temp[1], $temp[2]);
+
+      preg_match('/'. $node->title .' (.*?)-(.*?),/', $temp[0], $version);
+
+      $changelog[$version[1]][$version[2]] = array(
+        'title' => array_shift($temp),
+        'data' => implode("<br />\r", $temp)
+      );
+
+      $changelog[$version[1]][$version[2]]['data'] = preg_replace('/(#)(\d*)/', '<a href="http://drupal.org/node/\\2">\\1\\2</a>', $changelog[$version[1]][$version[2]]['data']);
+    }
+  }
+
+  drupal_set_title('changelog :: '. $node->title .' :: modules');
+  return theme('stuartc_changelog', $node, $changelog);
+}
+
+function stuartc_module_design_full() {
+  header('Content-Type: image/'. drupal_substr(arg(5), -3));
+
+  $path = file_directory_path() .'/design/'. drupal_substr(arg(5), 0, -4) .'_header'. drupal_substr(arg(5), -4) .'.crop_display.jpg';
+  _imagecache_cache('design_shadowbox', $path);
+  $path = imagecache_create_path('design_shadowbox', $path);
+
+  readfile($path);
+  exit;
+}

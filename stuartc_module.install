@@ -1,0 +1,36 @@
+<?php
+// $Id$
+
+/**
+ * @file
+ */
+
+/**
+ * Implementation of hook_schema().
+ */
+function stuartc_module_schema() {
+  $schema['stuartc_module_module_downloads'] = array(
+    'fields' => array(
+      'module' => array('type' => 'varchar', 'length' => 32, 'not null' => TRUE, 'default' => ''),
+      'updated' => array('type' => 'varchar', 'length' => 32, 'not null' => TRUE, 'default' => ''),
+      'data' => array('type' => 'text', 'size' => 'medium', 'not null' => TRUE, 'serialize' => TRUE),
+    ),
+    'primary key' => array('module'),
+  );
+
+  return $schema;
+}
+
+/**
+ * Implementation of hook_install().
+ */
+function stuartc_module_install() {
+  drupal_install_schema('stuartc_module');
+}
+
+/**
+ * Implementation of hook_uninstall().
+ */
+function stuartc_module_uninstall() {
+  drupal_uninstall_schema('stuartc_module');
+}

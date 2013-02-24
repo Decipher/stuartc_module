@@ -1,0 +1,5 @@
+; $Id$
+name = stuar.t c/lark module
+description = Custom module for <a href="http://stuar.tc/lark">Stuar.t C/lark</a>
+dependencies[] = views
+core = 6.x
